@@ -1,0 +1,94 @@
+name: CI/CD Pipeline
+
+# Trigger the pipeline on push to the `main` branch or any feature branches (e.g., `feature/*`)
+on:
+  push:
+    branches:
+      - main
+      - 'feature/*'  # Feature branches trigger CI/CD pipeline
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  # Job 1: Set up Node.js, install dependencies, lint, and run tests
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '16'  # Set Node.js version (can adjust to the version you're using)
+
+      - name: Install dependencies
+        run: |
+          npm install
+
+      - name: Run tests
+        run: |
+          npm run test  # Ensure you have test scripts set up in your package.json
+
+      - name: Run linting
+        run: |
+          npm run lint  # Ensure you have a linting script set up in your package.json
+
+  # Job 2: Build Docker Image and Push to ECR
+  docker:
+    needs: ci  # Ensure Docker builds only after the tests and lint steps pass
+    runs-on: ubuntu-latest
+    environment:
+      name: production  # Set your environment here (staging, production, etc.)
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up AWS CLI
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        run: |
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+
+      - name: Build Docker Image
+        run: |
+          docker build -t ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/my-app:latest .
+
+      - name: Push Docker Image to ECR
+        run: |
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/my-app:latest
+
+  # Job 3: Deploy to ECS
+  deploy:
+    needs: docker  # Ensure ECS deployment happens after Docker image is pushed to ECR
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up AWS CLI
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy to ECS
+        run: |
+          # Update ECS service to use the latest Docker image from ECR
+          aws ecs update-service \
+            --cluster my-cluster \
+            --service my-service \
+            --force-new-deployment \
+            --region ${{ secrets.AWS_REGION }}
+
+      - name: Notify Deployment Success
+        run: echo "Deployment to ECS was successful!"

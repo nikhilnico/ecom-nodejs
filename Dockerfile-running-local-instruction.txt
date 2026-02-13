@@ -1,0 +1,22 @@
+Running the Application
+
+Once everything is set up, you can build and run the services using Docker Compose. From the root of your project, run:
+
+docker-compose up --build
+
+
+The --build flag ensures that Docker rebuilds the images if necessary (e.g., if there are changes in the Dockerfile).
+
+This will start the NestJS API, PostgreSQL, Redis, and Elasticsearch services defined in docker-compose.yml.
+
+You can now access your API at http://localhost:3000.
+
+Step 5: Access Services
+
+NestJS API: Access the backend at http://localhost:3000.
+
+PostgreSQL: Connect to PostgreSQL at localhost:5432.
+
+Redis: Connect to Redis at localhost:6379.
+
+Elasticsearch: Access Elasticsearch at http://localhost:9200.
