@@ -1,3 +1,0 @@
-# ecom-nodejs
-
-# Test
