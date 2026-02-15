@@ -5,9 +5,10 @@ import { ThrottlerModule, ThrottlerModuleOptions } from '@nestjs/throttler';
 
 import databaseConfig from './config/database.config';
 import redisConfig from './config/redis.config';
-import { RedisModule } from './redis/redis.module';
+// import { RedisModule } from './redis/redis.module';
 import { ProductModule } from './products/product.module';
-import { ElasticsearchService } from './products/elasticsearch.service';
+// import { ElasticsearchService } from './products/elasticsearch.service';
+// import { ElasticsearchModule } from '@nestjs/elasticsearch';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import * as redisStore from 'cache-manager-redis-store';
@@ -15,10 +16,11 @@ import * as redisStore from 'cache-manager-redis-store';
 @Module({
   imports: [
     ConfigModule.forRoot({
-      load: [redisConfig],
+      isGlobal: true,
+      load: [redisConfig, databaseConfig],
     }),
     TypeOrmModule.forRoot(databaseConfig()),
-    RedisModule,
+    // RedisModule,
     ProductModule,
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
@@ -49,8 +51,17 @@ import * as redisStore from 'cache-manager-redis-store';
         };
       },
     }),
+
+    // Disabled now
+    // ElasticsearchModule.registerAsync({
+    //   inject: [ConfigService],
+    //   useFactory: (config: ConfigService) => ({
+    //     node: config.get('ELASTICSEARCH_URL'),
+    //   }),
+    // }),
+
   ],
   controllers: [AppController],
-  providers: [AppService, ElasticsearchService],
+  providers: [AppService],
 })
 export class AppModule {}

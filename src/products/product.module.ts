@@ -1,11 +1,14 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProductController } from './product.controller';
 import { ProductService } from './product.service';
-import { ElasticsearchService } from './elasticsearch.service'; // Import Elasticsearch service
+import { Product } from './entities/product.entity';
+import { ProductRepository } from './product.repository';  
+// import { ElasticsearchService } from './elasticsearch.service'; // Import Elasticsearch service
 
 @Module({
-  imports: [], // other modules can go here
+  imports: [TypeOrmModule.forFeature([Product, ProductRepository])], // other modules can go here
   controllers: [ProductController],
-  providers: [ProductService, ElasticsearchService], // Register ProductService and ElasticsearchService
+  providers: [ProductService], // Register ProductService and ElasticsearchService
 })
 export class ProductModule {}
