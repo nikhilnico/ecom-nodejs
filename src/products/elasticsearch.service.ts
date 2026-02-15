@@ -24,33 +24,35 @@ export class ElasticsearchService {
     }
   }
 
-  // Method to search for products in Elasticsearch
-  async searchProducts(query: string, filters: any, page: number = 1, size: number = 10) {
+  // Search products in Elasticsearch
+  async searchProducts(
+    query: string,
+    filters: Record<string, any> = {},
+    page = 1,
+    size = 10,
+  ) {
     const from = (page - 1) * size;
-    const filterQuery = Object.keys(filters).map((key) => ({
-      term: { [key]: filters[key] },
-    }));
 
-    const body = {
-      query: {
-        bool: {
-          must: [
-            { match: { description: query } },
-          ],
-          filter: filterQuery,
-        },
-      },
-      sort: [{ price: { order: 'asc' } }],
-      from,
-      size,
-    };
+    const filterQuery = Object.keys(filters)
+      .filter((key) => filters[key] !== undefined)
+      .map((key) => ({ term: { [key]: filters[key] } }));
 
     try {
       const result = await this.client.search({
         index: 'products',
-        body,
+        query: {
+          bool: {
+            must: [{ match: { description: query } }],
+            filter: filterQuery,
+          },
+        },
+        sort: [{ price: { order: 'asc' } }],
+        from,
+        size,
       });
-      return result.body.hits.hits;
+
+      // v8+: hits are directly on result.hits.hits
+      return result.hits.hits;
     } catch (error) {
       console.error('Error searching products:', error);
       return [];

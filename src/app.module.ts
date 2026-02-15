@@ -1,56 +1,56 @@
 import { Module } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule, ThrottlerModuleOptions } from '@nestjs/throttler';
+
+import databaseConfig from './config/database.config';
+import redisConfig from './config/redis.config';
+import { RedisModule } from './redis/redis.module';
+import { ProductModule } from './products/product.module';
+import { ElasticsearchService } from './products/elasticsearch.service';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import databaseConfig from './config/database.config'; // Import the database config
-
-import { ThrottlerModule } from '@nestjs/throttler';
-import { RedisModule } from './redis/redis.module'; // Create RedisModule
-import redisConfig from './config/redis.config';
-
-import { ElasticsearchService } from './elasticsearch.service'; // Adjust the path
-
-import { ProductModule } from './products/product.module'; // Import ProductModule
-
+import * as redisStore from 'cache-manager-redis-store';
 
 @Module({
-  providers: [ElasticsearchService],
-
   imports: [
-    ProductModule,
-    TypeOrmModule.forRoot(databaseConfig()),  // Add the config here
     ConfigModule.forRoot({
-      load: [redisConfig],  // Load Redis config
+      load: [redisConfig],
     }),
+    TypeOrmModule.forRoot(databaseConfig()),
     RedisModule,
-
+    ProductModule,
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: async (configService: ConfigService) => {
-        const rateLimitConfig = configService.get('rateLimiting');
-        const redisConfig = configService.get('redis');
 
-        if (rateLimitConfig.enabled && redisConfig.enabled) {
+      useFactory: async (configService: ConfigService): Promise<ThrottlerModuleOptions> => {
+        const rateLimitConfig = configService.get('rateLimiting');
+        const redisConf = configService.get('redis');
+
+        // New structure: ThrottlerModuleOptions is now { throttlers: ThrottlerOptions[] }
+        if (rateLimitConfig?.enabled && redisConf?.enabled) {
           return {
-            ttl: rateLimitConfig.windowMs / 1000, // Convert ms to seconds
-            limit: rateLimitConfig.maxRequests,
-            store: new RedisStore({
-              host: redisConfig.host,
-              port: redisConfig.port,
-              password: redisConfig.password,
-              db: redisConfig.db,
-            }),
+            throttlers: [{
+              // NOTE: In v5+, TTL is in MILLISECONDS
+              ttl: rateLimitConfig.windowMs, 
+              limit: rateLimitConfig.maxRequests,
+            }],
+            // If using a custom storage (like Redis), it sits outside the 'throttlers' array
+            // storage: new ThrottlerStorageRedis(redisInstance), 
           };
-        } else {
-          return { ttl: 60, limit: 100 };  // Fallback to default values if Redis is not enabled
         }
+
+        return {
+          throttlers: [{
+            ttl: 60000, // 60 seconds in ms
+            limit: 100,
+          }],
+        };
       },
     }),
-
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, ElasticsearchService],
 })
 export class AppModule {}

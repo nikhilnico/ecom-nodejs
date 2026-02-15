@@ -1,30 +1,31 @@
-import { Module, CacheModule } from '@nestjs/common';
+// src/cache/cache.module.ts
+import { Module } from '@nestjs/common';
+import { CacheModule } from '@nestjs/cache-manager'; // <- new import
 import { ConfigService } from '@nestjs/config';
-import * as redisStore from 'cache-manager-redis-store';
+import { redisStore } from 'cache-manager-redis-yet';
 
 @Module({
   imports: [
     CacheModule.registerAsync({
-      imports: [],
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => {
         const redisConfig = configService.get('redis');
-        if (redisConfig.enabled && configService.get('caching.enabled')) {
+        const cachingEnabled = configService.get('caching.enabled');
+
+        if (redisConfig?.enabled && cachingEnabled) {
           return {
             store: redisStore,
             host: redisConfig.host,
             port: redisConfig.port,
             password: redisConfig.password,
             db: redisConfig.db,
-            ttl: 600,  // Set TTL (Time to Live) in seconds
-          };
-        } else {
-          return {
-            ttl: 600,  // Default TTL for local cache
+            ttl: 600,
           };
         }
+
+        return { ttl: 600 }; // fallback to local in-memory cache
       },
     }),
   ],
 })
-export class CacheModule {}
+export class AppCacheModule {}

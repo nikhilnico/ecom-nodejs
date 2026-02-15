@@ -1,32 +1,36 @@
 import { Injectable } from '@nestjs/common';
-import { ElasticsearchService } from './elasticsearch.service'; // Import ElasticsearchService
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Product } from './entities/product.entity';
+import { ElasticsearchService } from './elasticsearch.service';
 
 @Injectable()
 export class ProductService {
-  constructor(private readonly elasticsearchService: ElasticsearchService) {}
+  constructor(
+    private readonly elasticsearchService: ElasticsearchService,
+    @InjectRepository(Product)
+    private readonly productRepo: Repository<Product>,
+  ) {}
 
-  // Method to create or update a product and index it in Elasticsearch
-  async createOrUpdateProduct(productId: string, productData: any) {
-    // Handle product creation logic here
-    // Example:
-    console.log('Product created or updated:', productData);
-
-    // After creating or updating the product, push it to Elasticsearch
-    await this.elasticsearchService.indexProduct(productId, productData);
+  async createOrUpdateProduct(productData: Partial<Product>): Promise<Product> {
+    const product: Product = this.productRepo.create(productData);
+    const saved = await this.productRepo.save(product);
+    await this.elasticsearchService.indexProduct(saved.id.toString(), saved);
+    return saved;
   }
 
-  // Method to search for products in Elasticsearch
-  async searchProducts(query: string, filters: any, page: number, size: number) {
+  async createProductWithImage(productData: Partial<Product>, imageUrl: string): Promise<Product> {
+    const product: Product = this.productRepo.create({
+      ...productData,
+      imageUrl,
+    });
+
+    const saved = await this.productRepo.save(product);
+    await this.elasticsearchService.indexProduct(saved.id.toString(), saved);
+    return saved;
+  }
+
+  async searchProducts(query: string, filters: any = {}, page = 1, size = 10) {
     return await this.elasticsearchService.searchProducts(query, filters, page, size);
-  }
-
-  async createProductWithImage(productData: any, imageUrl: string) {
-    // Save the product along with the image URL in the DB
-    const product = new Product();
-    product.name = productData.name;
-    product.imageUrl = imageUrl; // Store the S3 URL
-
-    // Save the product to DB
-    await product.save();
   }
 }

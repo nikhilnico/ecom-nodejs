@@ -5,7 +5,8 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { UsersService } from '../users/user.service';
 import { RefreshTokenGuard } from './refresh-token.guard'; // Optional for refreshing tokens
 import * as bcrypt from 'bcryptjs';
-import { Response } from 'express';
+import type { Response } from 'express';
+import type { Request } from 'express';
 
 @Controller('auth')
 export class AuthController {

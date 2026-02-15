@@ -16,4 +16,8 @@ export class User {
 
   @Column()
   password: string;  // Store hashed passwords, not plain text
+
+  @Column({ nullable: true })
+  currentHashedRefreshToken: string;
+
 }

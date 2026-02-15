@@ -1,8 +1,13 @@
+Step 1: docker build -t ecom-nodejs .
+
+Step 2: docker compose up --build
+
 Running the Application
 
 Once everything is set up, you can build and run the services using Docker Compose. From the root of your project, run:
 
-docker-compose up --build
+docker-compose up --build OR docker compose up --build
+
 
 
 The --build flag ensures that Docker rebuilds the images if necessary (e.g., if there are changes in the Dockerfile).

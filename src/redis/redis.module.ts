@@ -8,6 +8,7 @@ import { RedisService } from './redis.service'; // Create Redis service
     BullModule.forRootAsync({
       imports: [],
       inject: [ConfigService],
+      
       useFactory: async (configService: ConfigService) => {
         const redisConfig = configService.get('redis');
         const jobQueueConfig = configService.get('jobQueue');
@@ -21,10 +22,11 @@ import { RedisService } from './redis.service'; // Create Redis service
               db: redisConfig.db,
             },
           };
-        } else {
-          return null;  // Return null if job queue is disabled
         }
+
+        throw new Error('Job queue is disabled or Redis config missing');
       },
+
     }),
   ],
   providers: [RedisService],
