@@ -1,14 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Product } from './entities/product.entity';
-import { ProductRepository } from './product.repository';  
-// import { ElasticsearchService } from './elasticsearch.service';
+import { ProductRepository } from './product.repository';
 
 @Injectable()
 export class ProductService {
   constructor(
-    //private readonly elasticsearchService: ElasticsearchService,
     @InjectRepository(ProductRepository)
     private readonly productRepository: ProductRepository,
     @InjectRepository(Product)
@@ -17,9 +15,7 @@ export class ProductService {
 
   async createOrUpdateProduct(productData: Partial<Product>): Promise<Product> {
     const product: Product = this.productRepo.create(productData);
-    const saved = await this.productRepo.save(product);
-    // await this.elasticsearchService.indexProduct(saved.id.toString(), saved);
-    return saved;
+    return this.productRepo.save(product);
   }
 
   async createProductWithImage(productData: Partial<Product>, imageUrl: string): Promise<Product> {
@@ -28,27 +24,76 @@ export class ProductService {
       imageUrl,
     });
 
-    const saved = await this.productRepo.save(product);
-    // await this.elasticsearchService.indexProduct(saved.id.toString(), saved);
-    return saved;
+    return this.productRepo.save(product);
+  }
+
+  async listProducts(params: {
+    page?: number;
+    size?: number;
+    sort?: 'ASC' | 'DESC';
+    minPrice?: number;
+    maxPrice?: number;
+    categoryId?: number;
+  }) {
+    const page = params.page ?? 1;
+    const size = params.size ?? 10;
+    const qb = this.productRepo.createQueryBuilder('product');
+
+    if (params.categoryId) {
+      qb.andWhere('product.categoryId = :categoryId', { categoryId: params.categoryId });
+    }
+
+    if (params.minPrice !== undefined) {
+      qb.andWhere('product.price >= :minPrice', { minPrice: params.minPrice });
+    }
+
+    if (params.maxPrice !== undefined) {
+      qb.andWhere('product.price <= :maxPrice', { maxPrice: params.maxPrice });
+    }
+
+    qb.orderBy('product.id', params.sort ?? 'DESC');
+
+    const [items, total] = await qb.skip((page - 1) * size).take(size).getManyAndCount();
+
+    return { items, total, page, size };
+  }
+
+  async getProductById(id: number) {
+    const product = await this.productRepo.findOne({ where: { id } });
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    return product;
   }
 
   async searchProducts(query: string, filters: any = {}, page = 1, size = 10) {
-    // Since Elasticsearch is removed, you could implement a simple database search here instead
     const queryBuilder = this.productRepo.createQueryBuilder('product');
 
-    // You can add your filtering logic here based on `filters`
     if (query) {
-      queryBuilder.where('product.name LIKE :query', { query: `%${query}%` });
+      queryBuilder.where('product.name LIKE :query OR product.description LIKE :query', {
+        query: `%${query}%`,
+      });
     }
 
-    // Example pagination
+    if (filters.minPrice !== undefined) {
+      queryBuilder.andWhere('product.price >= :minPrice', { minPrice: filters.minPrice });
+    }
+
+    if (filters.maxPrice !== undefined) {
+      queryBuilder.andWhere('product.price <= :maxPrice', { maxPrice: filters.maxPrice });
+    }
+
     queryBuilder.skip((page - 1) * size).take(size);
 
-    return await queryBuilder.getMany();
+    const [items, total] = await queryBuilder.getManyAndCount();
+    return { items, total, page, size };
   }
-  // async searchProducts(query: string, filters: any = {}, page = 1, size = 10) {
-  //   return await this.elasticsearchService.searchProducts(query, filters, page, size);
-  // }
 
+  async getOutOfStockProducts() {
+    return this.productRepo
+      .createQueryBuilder('product')
+      .where('product.stock <= 0')
+      .getMany();
+  }
 }

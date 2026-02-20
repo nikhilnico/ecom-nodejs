@@ -12,6 +12,12 @@ import { ProductModule } from './products/product.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import * as redisStore from 'cache-manager-redis-store';
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/user.module';
+import { CategoryModule } from './category/category.module';
+import { CartModule } from './cart/cart.module';
+import { OrderModule } from './orders/order.module';
+import { CheckoutModule } from './checkout/checkout.module';
 
 @Module({
   imports: [
@@ -22,6 +28,12 @@ import * as redisStore from 'cache-manager-redis-store';
     TypeOrmModule.forRoot(databaseConfig()),
     // RedisModule,
     ProductModule,
+    AuthModule,
+    UsersModule,
+    CategoryModule,
+    CartModule,
+    OrderModule,
+    CheckoutModule,
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -30,24 +42,24 @@ import * as redisStore from 'cache-manager-redis-store';
         const rateLimitConfig = configService.get('rateLimiting');
         const redisConf = configService.get('redis');
 
-        // New structure: ThrottlerModuleOptions is now { throttlers: ThrottlerOptions[] }
         if (rateLimitConfig?.enabled && redisConf?.enabled) {
           return {
-            throttlers: [{
-              // NOTE: In v5+, TTL is in MILLISECONDS
-              ttl: rateLimitConfig.windowMs, 
-              limit: rateLimitConfig.maxRequests,
-            }],
-            // If using a custom storage (like Redis), it sits outside the 'throttlers' array
-            // storage: new ThrottlerStorageRedis(redisInstance), 
+            throttlers: [
+              {
+                ttl: rateLimitConfig.windowMs,
+                limit: rateLimitConfig.maxRequests,
+              },
+            ],
           };
         }
 
         return {
-          throttlers: [{
-            ttl: 60000, // 60 seconds in ms
-            limit: 100,
-          }],
+          throttlers: [
+            {
+              ttl: 60000, // 60 seconds in ms
+              limit: 100,
+            },
+          ],
         };
       },
     }),

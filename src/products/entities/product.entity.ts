@@ -16,7 +16,10 @@ export class Product {
   price: number;
 
   @Column()
-  imageUrl: string;  // Stored URL or path to product image
+  imageUrl: string;
+
+  @Column({ default: 0 })
+  stock: number;
 
   @ManyToOne(() => Category, (category) => category.products)
   @JoinColumn({ name: 'categoryId' })
