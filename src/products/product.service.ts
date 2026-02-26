@@ -1,8 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Between } from 'typeorm';
 import { Product } from './entities/product.entity';
 import { ProductRepository } from './product.repository';
+
+type ProductFilter = {
+  sort: 'ASC' | 'DESC';
+  minPrice: number;
+  maxPrice: number;
+  categoryId: number;
+};
 
 @Injectable()
 export class ProductService {
@@ -27,36 +34,48 @@ export class ProductService {
     return this.productRepo.save(product);
   }
 
-  async listProducts(params: {
-    page?: number;
-    size?: number;
-    sort?: 'ASC' | 'DESC';
-    minPrice?: number;
-    maxPrice?: number;
-    categoryId?: number;
-  }) {
-    const page = params.page ?? 1;
-    const size = params.size ?? 10;
-    const qb = this.productRepo.createQueryBuilder('product');
-
-    if (params.categoryId) {
-      qb.andWhere('product.categoryId = :categoryId', { categoryId: params.categoryId });
-    }
-
-    if (params.minPrice !== undefined) {
-      qb.andWhere('product.price >= :minPrice', { minPrice: params.minPrice });
-    }
-
-    if (params.maxPrice !== undefined) {
-      qb.andWhere('product.price <= :maxPrice', { maxPrice: params.maxPrice });
-    }
-
-    qb.orderBy('product.id', params.sort ?? 'DESC');
-
-    const [items, total] = await qb.skip((page - 1) * size).take(size).getManyAndCount();
-
-    return { items, total, page, size };
+  async listProducts(filters: ProductFilter): Promise<Product[]> {
+    return this.productRepo.find({
+      where: {
+        price: Between(filters.minPrice, filters.maxPrice),
+        categoryId: filters.categoryId,
+      },
+      order: {
+        price: filters.sort,  // must be 'ASC' or 'DESC'
+      },
+    });
   }
+
+  // async listProducts(params: {
+  //   page?: number;
+  //   size?: number;
+  //   sort?: 'ASC' | 'DESC';
+  //   minPrice?: number;
+  //   maxPrice?: number;
+  //   categoryId?: number;
+  // }) {
+  //   const page = params.page ?? 1;
+  //   const size = params.size ?? 10;
+  //   const qb = this.productRepo.createQueryBuilder('product');
+
+  //   if (params.categoryId) {
+  //     qb.andWhere('product.categoryId = :categoryId', { categoryId: params.categoryId });
+  //   }
+
+  //   if (params.minPrice !== undefined) {
+  //     qb.andWhere('product.price >= :minPrice', { minPrice: params.minPrice });
+  //   }
+
+  //   if (params.maxPrice !== undefined) {
+  //     qb.andWhere('product.price <= :maxPrice', { maxPrice: params.maxPrice });
+  //   }
+
+  //   qb.orderBy('product.id', params.sort ?? 'DESC');
+
+  //   const [items, total] = await qb.skip((page - 1) * size).take(size).getManyAndCount();
+
+  //   return { items, total, page, size };
+  // }
 
   async getProductById(id: number) {
     const product = await this.productRepo.findOne({ where: { id } });
@@ -95,5 +114,13 @@ export class ProductService {
       .createQueryBuilder('product')
       .where('product.stock <= 0')
       .getMany();
+  }
+
+  async deleteProduct(id: number): Promise<void> {
+    const product = await this.productRepo.findOne({ where: { id } });
+    if (!product) {
+      throw new NotFoundException(`Product with id ${id} not found`);
+    }
+    await this.productRepo.remove(product);
   }
 }
