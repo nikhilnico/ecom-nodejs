@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToOne } from 'typeorm';
+import { Cart } from '../../cart/entities/cart.entity';
 
 @Entity()
 export class User {
@@ -22,5 +23,8 @@ export class User {
     nullable: true,
   })
   currentHashedRefreshToken: string | null;
+
+  @OneToOne(() => Cart, (cart) => cart.user)
+  cart: Cart;
 
 }

@@ -8,7 +8,7 @@ type ProductFilter = {
   sort: 'ASC' | 'DESC';
   minPrice: number;
   maxPrice: number;
-  categoryId: number;
+  categoryId?: number;
 };
 
 @Injectable()
@@ -34,17 +34,23 @@ export class ProductService {
     return this.productRepo.save(product);
   }
 
-  async listProducts(filters: ProductFilter): Promise<Product[]> {
-    return this.productRepo.find({
-      where: {
-        price: Between(filters.minPrice, filters.maxPrice),
-        categoryId: filters.categoryId,
-      },
-      order: {
-        price: filters.sort,  // must be 'ASC' or 'DESC'
-      },
-    });
+async listProducts(filters: ProductFilter): Promise<Product[]> {
+  const whereCondition: any = {
+    price: Between(filters.minPrice, filters.maxPrice),
+  };
+
+  // Add categoryId only if provided
+  if (filters.categoryId !== undefined) {
+    whereCondition.categoryId = filters.categoryId;
   }
+
+  return this.productRepo.find({
+    where: whereCondition,
+    order: {
+      price: filters.sort, // 'ASC' | 'DESC'
+    },
+  });
+}
 
   // async listProducts(params: {
   //   page?: number;

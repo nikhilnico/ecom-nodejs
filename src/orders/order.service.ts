@@ -1,48 +1,95 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-
-export type Order = {
-  id: number;
-  userId: number;
-  items: { productId: number; quantity: number }[];
-  paymentIntentId: string;
-  status: 'pending' | 'paid';
-};
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Order, OrderStatus } from './entities/order.entity';
+import { OrderItem } from './entities/order-item.entity';
+import { Product } from '../products/entities/product.entity';
 
 @Injectable()
 export class OrderService {
-  private readonly orders: Order[] = [];
-  private sequence = 1;
+  constructor(
+    @InjectRepository(Order)
+    private readonly orderRepo: Repository<Order>,
 
-  createOrder(payload: Omit<Order, 'id' | 'status'>): Order {
-    const order: Order = {
-      id: this.sequence++,
-      status: 'pending',
-      ...payload,
-    };
+    @InjectRepository(Product)
+    private readonly productRepo: Repository<Product>,
+  ) {}
 
-    this.orders.push(order);
-    return order;
+  async createOrder(data: {
+    userId: number;
+    items: { productId: number; quantity: number }[];
+    paymentIntentId: string;
+  }) {
+    let total = 0;
+    const orderItems: OrderItem[] = [];
+
+    for (const item of data.items) {
+      const product = await this.productRepo.findOne({
+        where: { id: item.productId },
+      });
+
+      if (!product) {
+        throw new NotFoundException('Product not found');
+      }
+
+      if (product.stock < item.quantity) {
+        throw new Error(`Insufficient stock for ${product.name}`);
+      }
+
+      // decrease stock
+      product.stock -= item.quantity;
+      await this.productRepo.save(product);
+
+      const orderItem = new OrderItem();
+      orderItem.productId = product.id;
+      orderItem.quantity = item.quantity;
+      orderItem.price = Number(product.price);
+
+      total += Number(product.price) * item.quantity;
+
+      orderItems.push(orderItem);
+    }
+
+    const order = this.orderRepo.create({
+      userId: data.userId,
+      paymentIntentId: data.paymentIntentId,
+      totalAmount: total,
+      items: orderItems,
+      status: OrderStatus.PENDING,
+    });
+
+    return this.orderRepo.save(order);
   }
 
-  getOrdersByUser(userId: number) {
-    return this.orders.filter((order) => order.userId === userId);
-  }
+  async markPaid(paymentIntentId: string) {
+    const order = await this.orderRepo.findOne({
+      where: { paymentIntentId },
+    });
 
-  getOrderById(id: number) {
-    const order = this.orders.find((entry) => entry.id === id);
     if (!order) {
       throw new NotFoundException('Order not found');
     }
-    return order;
+
+    order.status = OrderStatus.PAID;
+    return this.orderRepo.save(order);
   }
 
-  markPaid(paymentIntentId: string) {
-    const order = this.orders.find((entry) => entry.paymentIntentId === paymentIntentId);
+  async getOrdersByUser(userId: number) {
+    return this.orderRepo.find({
+      where: { userId },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async getOrderById(id: number) {
+    const order = await this.orderRepo.findOne({
+      where: { id },
+    });
+
     if (!order) {
-      return null;
+      throw new NotFoundException('Order not found');
     }
 
-    order.status = 'paid';
     return order;
   }
 }

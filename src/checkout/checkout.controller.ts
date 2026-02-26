@@ -12,18 +12,29 @@ export class CheckoutController {
   ) {}
 
   @Post('checkout')
-  checkout(@Req() request: Request, @Body() body: { paymentProvider: string }) {
+  async checkout(
+    @Req() request: Request,
+    @Body() body: { paymentProvider: string },
+  ) {
     const userId = getRequestUserId(request);
-    const cart = this.cartService.getCart(userId);
-    const paymentIntentId = `${body.paymentProvider ?? 'provider'}-${Date.now()}`;
+    const cart = await this.cartService.getCart(userId);
 
-    const order = this.orderService.createOrder({
+    if (!cart.items.length) {
+      throw new Error('Cart is empty');
+    }
+
+    const paymentIntentId = `${body.paymentProvider ?? 'mock'}-${Date.now()}`;
+
+    const order = await this.orderService.createOrder({
       userId,
-      items: cart.items.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+      items: cart.items.map((item) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+      })),
       paymentIntentId,
     });
 
-    this.cartService.clearCart(userId);
+    await this.cartService.clearCart(userId);
 
     return {
       order,
@@ -35,11 +46,13 @@ export class CheckoutController {
   }
 
   @Post('webhooks/payment')
-  paymentWebhook(@Body() body: { paymentIntentId: string; event: string }) {
+  async paymentWebhook(
+    @Body() body: { paymentIntentId: string; event: string },
+  ) {
     if (body.event === 'payment.succeeded') {
       return {
         acknowledged: true,
-        order: this.orderService.markPaid(body.paymentIntentId),
+        order: await this.orderService.markPaid(body.paymentIntentId),
       };
     }
 

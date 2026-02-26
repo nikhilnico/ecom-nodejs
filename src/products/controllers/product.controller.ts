@@ -19,7 +19,7 @@ export class ProductController {
       sort: sortOrder,
       minPrice: Number(query.minPrice),
       maxPrice: Number(query.maxPrice),
-      categoryId: Number(query.categoryId),
+      categoryId: query.categoryId ? Number(query.categoryId) : undefined,
     });
   }
 
@@ -42,22 +42,4 @@ export class ProductController {
     );
   }
 }
-
-// @Controller('admin/products')
-// export class AdminProductController {
-//   constructor(private readonly productService: ProductService) {}
-
-//   @ApiTags('Products')
-//   @Post()
-//   @ApiBody({ type: CreateProductDto })
-//   async createProduct(@Body() body: CreateProductDto) {
-//     return this.productService.createOrUpdateProduct(body);
-//   }
-
-//   @Put(':id')
-//   async updateProduct(@Param('id', ParseIntPipe) id: number, @Body() body: Partial<any>) {
-//     return this.productService.createOrUpdateProduct({ ...body, id });
-//   }
-// }
-
 
